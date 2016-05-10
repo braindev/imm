@@ -13,10 +13,9 @@ document.addEventListener("DOMContentLoaded", function(event) {
   );
 });
 
-
 var App = React.createClass({
   getInitialState: function(){
-    var structure = immstruct('survey-data', { newSurveyName: '', surveys: [] });
+    var structure = immstruct('survey-data', { surveys: [] });
     structure.on('swap', function (newStructure, oldStructure, keyPath) {
       this.setState({ cursor: immstruct('survey-data').cursor() });
     }.bind(this));
@@ -27,22 +26,18 @@ var App = React.createClass({
   },
 
   updateNewSurveyName: function(e) {
-    this.state.cursor.cursor('newSurveyName').update(function(){
-      return e.target.value;
-    }.bind(this));
+    this.setState({newSurveyName: e.target.value});
   },
 
   createSurvey: function(e) {
     e.preventDefault();
-    var name = this.state.cursor.cursor('newSurveyName').deref().trim();
+    var name = this.state.newSurveyName;
     if (name) {
       this.state.cursor.cursor('surveys').update(function(surveys){
         var s = surveys.push(Immutable.fromJS({ name: name, questions: [] }));
         return s;
       }.bind(this));
-      this.state.cursor.cursor('newSurveyName').update(function() {
-        return '';
-      });
+      this.setState({newSurveyName: ''});
     }
   },
 
@@ -68,8 +63,7 @@ var App = React.createClass({
               {' '}
               <input
                 type='text'
-                id=''
-                value={this.state.cursor.cursor('newSurveyName').deref()}
+                value={this.state.newSurveyName}
                 onChange={this.updateNewSurveyName}
               />
             </p>
@@ -88,21 +82,23 @@ var App = React.createClass({
 });
 
 var Survey = React.createClass({
+  getInitialState: function() {
+    return { newQuestion: '' };
+  },
+
   shouldComponentUpdate: function(nextProps, nextState){
-    return nextProps.survey.deref() !== this.props.survey.deref();
+    return nextProps.survey.deref() !== this.props.survey.deref() || nextState.newQuestion !== this.state.newQuestion;
   },
 
   createQuestion: function(e) {
     e.preventDefault();
-    var name = this.props.survey.cursor('newQuestion').deref();
+    var name = this.state.newQuestion.trim();
     if (name) {
       this.props.survey.cursor('questions').update(function(questions){
-        var q = Immutable.fromJS({name: name, newAnswer: '', answers: [] });
+        var q = Immutable.fromJS({name: name, answers: [] });
         return questions.push(q);
       }.bind(this));
-      this.props.survey.cursor('newQuestion').update(function() {
-        return '';
-      });
+      this.setState({newQuestion: ''});
     }
   },
 
@@ -111,15 +107,12 @@ var Survey = React.createClass({
   },
 
   updateNewQuestion: function(e) {
-    this.props.survey.cursor('newQuestion').update(function(){
-      return e.target.value;
-    }.bind(this));
+    this.setState({newQuestion: e.target.value});
   },
 
   render: function() {
     var s = this.props.survey;
-    console.log('render survey', s.cursor('name').deref());
-    console.log('rendering survey');
+    console.log('rendering survey', s.cursor('name').deref());
     return <div className='survey'>
       <h3>
         Survey: {s.cursor('name').deref()}
@@ -136,8 +129,7 @@ var Survey = React.createClass({
         {' '}
         <input
           type='text'
-          id=''
-          value={s.cursor('newQuestion').deref() || ''}
+          value={this.state.newQuestion}
           onChange={this.updateNewQuestion}
           placeholder='question'
         />
@@ -150,29 +142,31 @@ var Survey = React.createClass({
 });
 
 var Question = React.createClass({
+  getInitialState: function() {
+    return {
+      newAnswer: ''
+    };
+  },
+
   shouldComponentUpdate: function(nextProps, nextState){
-    return nextProps.question.deref() !== this.props.question.deref();
+    return nextProps.question.deref() !== this.props.question.deref() || this.state.newAnswer !== nextState.newAnswer;
   },
 
   updateAnswer: function(e) {
-    this.props.question.cursor('newAnswer').update(function(){
-      return e.target.value;
-    });
+    this.setState({newAnswer: e.target.value});
   },
 
   createAnswer: function(e) {
     e.preventDefault();
 
     var q = this.props.question;
-    var name = q.cursor('newAnswer').deref().trim();
+    var name = this.state.newAnswer.trim();
 
     if (name) {
       q.cursor('answers').update(function(answers) {
         return answers.push(Immutable.fromJS({name: name }));
       });
-      q.cursor('newAnswer').update(function(){
-        return '';
-      });
+      this.setState({newAnswer: ''});
     }
   },
 
@@ -200,8 +194,7 @@ var Question = React.createClass({
         {' '}
         <input
           type='text'
-          id=''
-          value={q.cursor('newAnswer').deref() || ''}
+          value={this.state.newAnswer}
           onChange={this.updateAnswer}
           placeholder='new answer'
         />
