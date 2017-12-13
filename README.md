@@ -6,6 +6,5 @@ This is a little project to show off [Immstruct](https://github.com/omniscientjs
 
 1. 'git clone ...`
 1. `npm install`
-1. `npm install -g webpack-dev-server`
-1. `webpack-dev-server`
-1. open browser to http://localhost:8080
+1. `npm run dev`
+1. open browser to http://localhost:1234

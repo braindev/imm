@@ -1,228 +1,291 @@
-/*global require*/
-"use strict";
+import React, { Component } from 'react';
+import ReactDOM from 'react-dom';
+import PropTypes from 'prop-types';
+import immstruct from 'immstruct';
+import Immutable from 'immutable';
 
-var React = require('react');
-var ReactDOM = require('react-dom');
-var immstruct = require('immstruct');
-var Immutable = require('immutable');
-
-document.addEventListener("DOMContentLoaded", function(event) {
+document.addEventListener("DOMContentLoaded", (event) => {
   ReactDOM.render(
     <App />,
     document.getElementById('app')
   );
 });
 
-var App = React.createClass({
-  getInitialState: function(){
-    var structure = immstruct('survey-data', { surveys: [] });
-    structure.on('swap', function (newStructure, oldStructure, keyPath) {
-      this.setState({ cursor: immstruct('survey-data').cursor() });
-    }.bind(this));
-    return {
-      cursor: structure.cursor(),
+class App extends Component {
+  constructor(props) {
+    super(props);
+    this.structure = immstruct('survey-data', { surveys: [] });
+    this.structure.on('swap', (newStructure, oldStructure, keyPath) => {
+      this.setState({ appData: this.structure.cursor() });
+    });
+    this.state = {
+      appData: this.structure.cursor(),
       newSurveyName: '',
     };
-  },
+  }
 
-  updateNewSurveyName: function(e) {
+  componentWillUnmount() {
+    this.structure.st.removeAllListeners();
+    immstruct.remove('survey-data');
+  }
+
+  updateNewSurveyName(e) {
     this.setState({newSurveyName: e.target.value});
-  },
+  }
 
-  createSurvey: function(e) {
+  createSurvey(e) {
     e.preventDefault();
-    var name = this.state.newSurveyName;
+    const name = this.state.newSurveyName;
     if (name) {
-      this.state.cursor.cursor('surveys').update(function(surveys){
-        var s = surveys.push(Immutable.fromJS({ name: name, questions: [] }));
-        return s;
-      }.bind(this));
+      this.state.appData.cursor('surveys').update((surveys) => {
+        return surveys.push(Immutable.fromJS({ name: name, questions: [] }));
+      });
       this.setState({newSurveyName: ''});
     }
-  },
+  }
 
-  removeSurvey: function(i) {
-    this.state.cursor.cursor('surveys').delete(i);
-  },
+  removeSurvey(idx) {
+    this.state.appData.cursor('surveys').delete(idx);
+  }
 
-  render: function(){
-    return <div>
-      <h1>Survery Builder</h1>
-      <div className='pure-g'>
-        <div className='pure-u-1-2'>
-          <form className='pure-form' onSubmit={this.createSurvey}>
-            <p>
-              <button
-                type='button'
-                className='pure-button'
-                placeholder='survey name'
-                onClick={this.createSurvey}
-              >
-                <i className='fa fa-plus-circle'></i> Create Survey
-              </button>
-              {' '}
-              <input
-                type='text'
-                value={this.state.newSurveyName}
-                onChange={this.updateNewSurveyName}
-              />
-            </p>
-          </form>
+  render() {
+    const { appData } = this.state;
+    return (
+      <div>
+        <h1>Survey Builder</h1>
+        <div className='pure-g'>
+          <div className='pure-u-1-2'>
+            <form className='pure-form' onSubmit={this.createSurvey.bind(this)}>
+              <p>
+                <button
+                  type='button'
+                  className='pure-button'
+                  placeholder='survey name'
+                  onClick={this.createSurvey.bind(this)}
+                >
+                  <i className='fa fa-plus-circle'></i> Create Survey
+                </button>
+                {' '}
+                <input
+                  type='text'
+                  value={this.state.newSurveyName}
+                  onChange={this.updateNewSurveyName.bind(this)}
+                />
+              </p>
+            </form>
 
-          {this.state.cursor.cursor('surveys').toJS().map(function(s, i){
-            return <Survey key={i} removeSurvey={this.removeSurvey.bind(this, i)} survey={this.state.cursor.cursor(['surveys', i])} />;
-          }.bind(this))}
-        </div>
-        <div className='pure-u-1-2'>
-          <pre>{JSON.stringify(this.state.cursor.toJS(), undefined, '  ')}</pre>
+            {appData.cursor('surveys').toArray().map((_, i)=>{
+              return <Survey
+                key={i}
+                removeSurvey={this.removeSurvey.bind(this, i)}
+                survey={appData.cursor(['surveys', i])}
+              />;
+            })}
+          </div>
+          <div className='pure-u-1-2'>
+            <RawData data={appData.toJS()} />
+          </div>
         </div>
       </div>
-    </div>;
+    );
   }
-});
+}
 
-var Survey = React.createClass({
-  getInitialState: function() {
-    return { newQuestion: '' };
-  },
+const RawData = (props) => {
+  return (
+    <pre>{JSON.stringify(props.data, undefined, '  ')}</pre>
+  );
+};
 
-  shouldComponentUpdate: function(nextProps, nextState){
-    return nextProps.survey.deref() !== this.props.survey.deref() || nextState.newQuestion !== this.state.newQuestion;
-  },
+RawData.propTypes = {
+  data: PropTypes.object.isRequired,
+};
 
-  createQuestion: function(e) {
+class Survey extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { newQuestion: '' };
+  }
+
+  shouldComponentUpdate(nextProps, nextState){
+    return nextProps.survey.deref() !== this.props.survey.deref() ||
+      nextState.newQuestion !== this.state.newQuestion;
+  }
+
+  createQuestion(e) {
     e.preventDefault();
-    var name = this.state.newQuestion.trim();
+    const name = this.state.newQuestion.trim();
     if (name) {
-      this.props.survey.cursor('questions').update(function(questions){
-        var q = Immutable.fromJS({name: name, answers: [] });
-        return questions.push(q);
-      }.bind(this));
+      this.props.survey.cursor('questions').update((questions)=>{
+        const question = Immutable.fromJS({name: name, answers: [] });
+        return questions.push(question);
+      });
       this.setState({newQuestion: ''});
     }
-  },
-
-  removeQuestion: function(i) {
-    this.props.survey.cursor('questions').delete(i);
-  },
-
-  updateNewQuestion: function(e) {
-    this.setState({newQuestion: e.target.value});
-  },
-
-  render: function() {
-    var s = this.props.survey;
-    console.log('rendering survey', s.cursor('name').deref());
-    return <div className='survey'>
-      <h3>
-        Survey: {s.cursor('name').deref()}
-      </h3>
-      <p>
-        <button type='button' className='pure-button button-error button-xsmall' onClick={this.props.removeSurvey}>
-          <i className='fa fa-minus-circle'></i> Remove Survey
-        </button>
-      </p>
-      <form className='pure-form' onSubmit={this.createQuestion}>
-        <button className='pure-button' type='button' onClick={this.createQuestion}>
-          <i className='fa fa-plus-circle'></i> Create Question
-        </button>
-        {' '}
-        <input
-          type='text'
-          value={this.state.newQuestion}
-          onChange={this.updateNewQuestion}
-          placeholder='question'
-        />
-      </form>
-      {this.props.survey.cursor('questions').toJS().map(function(q, i){
-        return <Question key={i} question={s.cursor(['questions', i])} removeQuestion={this.removeQuestion.bind(this, i)} />;
-      }.bind(this))}
-    </div>;
   }
-});
 
-var Question = React.createClass({
-  getInitialState: function() {
-    return {
-      newAnswer: ''
-    };
-  },
+  removeQuestion(idx) {
+    this.props.survey.cursor('questions').delete(idx);
+  }
 
-  shouldComponentUpdate: function(nextProps, nextState){
-    return nextProps.question.deref() !== this.props.question.deref() || this.state.newAnswer !== nextState.newAnswer;
-  },
+  updateNewQuestion(e) {
+    this.setState({newQuestion: e.target.value});
+  }
 
-  updateAnswer: function(e) {
+  render() {
+    const {
+      survey,
+      removeSurvey,
+    } = this.props;
+
+    return (
+      <div className='survey'>
+        <h3>
+          Survey: {survey.cursor('name').deref()}
+        </h3>
+        <p>
+          <button
+            type='button'
+            className='pure-button button-error button-xsmall'
+            onClick={removeSurvey.bind(this)}
+          >
+            <i className='fa fa-minus-circle'></i> Remove Survey
+          </button>
+        </p>
+        <form className='pure-form' onSubmit={this.createQuestion.bind(this)}>
+          <button className='pure-button' type='button' onClick={this.createQuestion.bind(this)}>
+            <i className='fa fa-plus-circle'></i> Create Question
+          </button>
+          {' '}
+          <input
+            type='text'
+            value={this.state.newQuestion}
+            onChange={this.updateNewQuestion.bind(this)}
+            placeholder='question'
+          />
+        </form>
+        {survey.cursor('questions').toArray().map((_, idx)=>{
+          return <Question key={idx}
+            question={survey.cursor(['questions', idx])}
+            removeQuestion={this.removeQuestion.bind(this, idx)}
+          />;
+        })}
+      </div>
+    );
+  }
+}
+
+Survey.propTypes = {
+  survey: PropTypes.shape({
+    cursor: PropTypes.func.isRequired,
+    deref: PropTypes.func.isRequired,
+  }).isRequired,
+  removeSurvey: PropTypes.func.isRequired,
+};
+
+
+class Question extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { newAnswer: '' };
+  }
+
+  shouldComponentUpdate(nextProps, nextState){
+    return nextProps.question.deref() !== this.props.question.deref() ||
+      this.state.newAnswer !== nextState.newAnswer;
+  }
+
+  updateAnswer(e) {
     this.setState({newAnswer: e.target.value});
-  },
+  }
 
-  createAnswer: function(e) {
+  createAnswer(e) {
     e.preventDefault();
 
-    var q = this.props.question;
-    var name = this.state.newAnswer.trim();
+    const { question } = this.props;
+    const name = this.state.newAnswer.trim();
 
     if (name) {
-      q.cursor('answers').update(function(answers) {
+      question.cursor('answers').update((answers) => {
         return answers.push(Immutable.fromJS({name: name }));
       });
       this.setState({newAnswer: ''});
     }
-  },
+  }
 
-  removeAnswer: function(i, e) {
-    this.props.question.cursor('answers').update(function(answers){
+  removeAnswer(i, e) {
+    this.props.question.cursor('answers').update((answers) => {
       return answers.delete(i);
-    }.bind(this));
-  },
-
-  render: function() {
-    var q = this.props.question;
-    console.log('render question', q.cursor('name').deref());
-    var answers = q.cursor('answers').toJS() || [];
-    return <div className='question'>
-      <h4>Question: {q.cursor('name').deref()}</h4>
-      <p>
-        <button type='button' className='pure-button button-error button-xsmall' onClick={this.props.removeQuestion}>
-          <i className='fa fa-minus-circle'></i> Remove Question
-        </button>
-      </p>
-      <form onSubmit={this.createAnswer} className='pure-form'>
-        <button type='submit' className='pure-button'>
-          <i className='fa fa-plus-circle'></i> Add Answer
-        </button>
-        {' '}
-        <input
-          type='text'
-          value={this.state.newAnswer}
-          onChange={this.updateAnswer}
-          placeholder='new answer'
-        />
-      </form>
-      <ul className='answer-list'>
-        {answers.map(function(a, i){
-          return <li key={i}>
-            <button type='button' className='pure-button button-xsmall button-error' onClick={this.removeAnswer.bind(this, i)}>
-              <i className='fa fa-minus-circle'></i> Remove
-            </button>
-            {' '}
-            <Answer answer={q.cursor(['answers', i])} />
-          </li>;
-        }.bind(this))}
-      </ul>
-    </div>;
+    });
   }
-});
 
-var Answer = React.createClass({
-  shouldComponentUpdate: function(nextProps, nextState){
+  render() {
+    const { question, removeQuestion } = this.props;
+    const answers = question.cursor('answers').toArray() || [];
+    return (
+      <div className='question'>
+        <h4>Question: {question.cursor('name').deref()}</h4>
+        <p>
+          <button type='button' className='pure-button button-error button-xsmall' onClick={removeQuestion}>
+            <i className='fa fa-minus-circle'></i> Remove Question
+          </button>
+        </p>
+        <form onSubmit={this.createAnswer.bind(this)} className='pure-form'>
+          <button type='submit' className='pure-button'>
+            <i className='fa fa-plus-circle'></i> Add Answer
+          </button>
+          {' '}
+          <input
+            type='text'
+            value={this.state.newAnswer}
+            onChange={this.updateAnswer.bind(this)}
+            placeholder='new answer'
+          />
+        </form>
+        <ul className='answer-list'>
+          {answers.map((_, i) => {
+            return <li key={i}>
+              <button type='button'
+                className='pure-button button-xsmall button-error'
+                onClick={this.removeAnswer.bind(this, i)}
+              >
+                <i className='fa fa-minus-circle'></i> Remove
+              </button>
+              {' '}
+              <Answer answer={question.cursor(['answers', i])} />
+            </li>;
+          })}
+        </ul>
+      </div>
+    );
+  }
+}
+
+Question.propTypes = {
+  question: PropTypes.shape({
+    cursor: PropTypes.func.isRequired,
+    deref: PropTypes.func.isRequired,
+  }).isRequired,
+  removeQuestion: PropTypes.func.isRequired,
+};
+
+class Answer extends Component {
+  shouldComponentUpdate(nextProps, nextState){
     return nextProps.answer.deref() !== this.props.answer.deref();
-  },
-
-  render: function() {
-    console.log('render answer', this.props.answer.cursor('name').deref());
-    return <span>
-      {this.props.answer.cursor('name').deref()}
-    </span>;
   }
-});
+
+  render() {
+    return (
+      <span>
+        {this.props.answer.cursor('name').deref()}
+      </span>
+    );
+  }
+}
+
+Answer.propTypes = {
+  answer: PropTypes.shape({
+    cursor: PropTypes.func.isRequired,
+    deref: PropTypes.func.isRequired,
+  }).isRequired,
+};
